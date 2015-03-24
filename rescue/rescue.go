@@ -14,7 +14,7 @@ const (
 	P       = 1 << iota
 	U       = 1 << iota
 	E       = 1 << iota
-	visited = 1 << iota
+//	visited = 1 << iota
 )
 
 // height, width and number of people, unpassable objects and exits
@@ -65,6 +65,7 @@ func calculatePaths(pos int) {
 
 	queue := make([]int, m*n)
 	paths := make([]int, m*n)
+	visited := make([]bool, m*n)
 	head := 0
 	tail := 1
 
@@ -76,7 +77,7 @@ func calculatePaths(pos int) {
 		head += 1
 		expanded := expand(p)
 		for _, nb := range expanded {
-			if matrix[nb] & visited == 0 {
+			if !visited[nb] {
 				matrix[nb] |= visited
 				queue[tail] = nb
 				paths[tail] = p
