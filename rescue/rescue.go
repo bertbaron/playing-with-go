@@ -42,20 +42,53 @@ func isValid(x, y int) bool {
 	return 0 <= x && x < n && 0 <= y && y < m
 }
 
-func expand(pos int) []int {
+func expand(pos int, buffer *[8]int) int {
 	x, y := unpack(pos)
-	expanded := make([]int, 0, 8)
+	count := 0
 	for i := x - 1; i <= x+1; i++ {
 		for j := y - 1; j <= y+1; j++ {
 			if (i != x || j != y) && isValid(i, j) {
 				neighbour := pack(i, j)
 				if matrix[neighbour] & U == 0 {
-					expanded = append(expanded, neighbour)
+					buffer[count] = neighbour
+					count++
 				}
 			}
 		}
 	}
-	return expanded
+	return count
+}
+
+//Map from P node to a map of reachable P nodes with the path between them
+var paths map[int]map[int][]int = make(map[int]map[int][]int)
+
+func addPathToMap(from, to int, path []int) {
+	if _, ok := paths[from]; !ok {
+		paths[from]=make(map[int][]int)
+	}
+	nodeMap := paths[from]
+	nodeMap[to] = path
+}
+
+func addPath(from, to int, links []int) {
+//	fmt.Printf("  from %d to %d\n", from, to)
+	path := make([]int, 0)
+	for links[to] >= 0 {
+		path = append(path, to)
+		to = links[to]
+	}
+	path = append(path, to)
+	backward := path[1:]
+	count := len(path)
+	forward := make([]int, count, count)
+	for i, point := range path {
+		forward[count-1-i] = point
+	}
+	forward = forward[1:]
+//	fmt.Println("  forward=%s", forward)
+//	fmt.Println("  backward=%s", backward)
+	addPathToMap(from, to, forward)
+	addPathToMap(to, from, backward)
 }
 
 func calculatePaths(pos int) {
@@ -63,31 +96,45 @@ func calculatePaths(pos int) {
 	fmt.Printf("Calculating paths from (%d,%d)\n", x, y)
 	start := time.Now()
 
+	var buffer [8]int
 	queue := make([]int, m*n)
-	paths := make([]int, m*n)
+	parents := make([]int, m*n)
 	visited := make([]bool, m*n)
 	head := 0
 	tail := 1
-
+	exitFound := false
 	queue[head] = pos
-	paths[head] = -1
+	parents[pos] = -1
+	visited[pos] = true
 	for head < tail {
 		ops += 1
 		p := queue[head]
 		head += 1
-		expanded := expand(p)
-		for _, nb := range expanded {
+		
+		if matrix[p] & P != 0 {
+			x, y := unpack(p)
+			fmt.Printf("  found (%d, %d)\n", x, y)
+			addPath(pos, p, parents)
+		}
+		if !exitFound && matrix[p] & E != 0 {
+			x, y := unpack(p)
+			fmt.Printf("  found exit (%d, %d)\n", x, y)
+			exitFound = true
+		}
+		
+		expanded := expand(p, &buffer)
+		for i := 0; i < expanded; i++ {
+			nb := buffer[i]
 			if !visited[nb] {
-				matrix[nb] |= visited
+				visited[nb] = true
+				if parents[nb] != 0 { panic("there is already a parent configured") }
+				parents[nb] = p
 				queue[tail] = nb
-				paths[tail] = p
 				tail += 1
 			}
 		}
 	}
-	elapsed := time.Since(start)
-    log.Printf("Traversed in %s\n", elapsed)
-
+    fmt.Printf("Traversed in %s\n", time.Since(start))
 }
 
 func parseInt(s string) int {
@@ -116,7 +163,8 @@ func nextLine(scanner *bufio.Scanner) string {
 }
 
 func main() {
-	file, err := os.Open("/home/bert/git/codeeval/examples/rescue.huge")
+//	file, err := os.Open("/home/bert/git/codeeval/examples/rescue.huge")
+	file, err := os.Open("/home/bbaron/codeeval/examples/rescue.huge")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -155,11 +203,13 @@ func main() {
 	fmt.Println("")
 
 	elapsed := time.Since(start)
-    log.Printf("Parsed in %s", elapsed)
+    fmt.Printf("Parsed in %s\n", elapsed)
 
 	for k := range ps {
 		calculatePaths(k)
 	}
+
+//	fmt.Printf("paths: %s", paths)
 	
 	fmt.Printf("%d operations\n", ops)
 	fmt.Printf("Total time: %s", time.Since(start))
