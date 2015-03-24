@@ -7,6 +7,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 )
 
 const (
@@ -58,27 +59,34 @@ func expand(pos int) []int {
 }
 
 func calculatePaths(pos int) {
-	type node struct {
-		p      int
-		parent *node
-	}
-	queue := make([]node, m*n)
+	x, y := unpack(pos)
+	fmt.Printf("Calculating paths from (%d,%d)\n", x, y)
+	start := time.Now()
+
+	queue := make([]int, m*n)
+	paths := make([]int, m*n)
 	head := 0
 	tail := 1
-	queue[head] = node{pos, nil}
+
+	queue[head] = pos
+	paths[head] = -1
 	for head < tail {
 		ops += 1
-		path := queue[head]
+		p := queue[head]
 		head += 1
-		expanded := expand(path.p)
+		expanded := expand(p)
 		for _, nb := range expanded {
 			if matrix[nb] & visited == 0 {
 				matrix[nb] |= visited
-				queue[tail] = node{nb, &path}
+				queue[tail] = nb
+				paths[tail] = p
 				tail += 1
 			}
 		}
 	}
+	elapsed := time.Since(start)
+    log.Printf("Traversed in %s\n", elapsed)
+
 }
 
 func parseInt(s string) int {
@@ -113,11 +121,13 @@ func main() {
 	}
 	defer file.Close()
 
+	start := time.Now()
 	scanner := bufio.NewScanner(file)
 	n, m = parseTuple(nextLine(scanner))
 	fmt.Printf("n=%d, m=%d\n", n, m)
+	
 	matrix = make([]byte, n*m)
-
+    
 	// parse people
 	p = parseInt(nextLine(scanner))
 	ps = make(map[int]bool)
@@ -141,14 +151,15 @@ func main() {
 		matrix[pos] |= E
 	}
 
-	expanded := expand(pack(1, 0))
-	fmt.Printf("Expand: ")
-	for _, p := range expanded {
-		x, y := unpack(p)
-		fmt.Printf(" (%d,%d)", x, y)
-	}
 	fmt.Println("")
-	calculatePaths(0)
-	fmt.Printf("%d operations", ops)
-	fmt.Println("Done...")
+
+	elapsed := time.Since(start)
+    log.Printf("Parsed in %s", elapsed)
+
+	for k := range ps {
+		calculatePaths(k)
+	}
+	
+	fmt.Printf("%d operations\n", ops)
+	fmt.Printf("Total time: %s", time.Since(start))
 }
