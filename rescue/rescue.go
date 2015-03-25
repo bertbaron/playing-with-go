@@ -17,19 +17,21 @@ const (
 	E = 1 << iota
 )
 
+type point int32
+
 type graph struct {
     //Map from P node to a map of reachable P nodes with the path between them
-	node2nodes map[int32]map[int32][]int32
+	node2nodes map[point]map[point][]point
 	
 	//Map from node to path to nearest exit (last element is the exit)
-	node2exit map[int32][]int32
+	node2exit map[point][]point
 }
 
 func newGraph() graph {
-	return graph{make(map[int32]map[int32][]int32), make(map[int32][]int32)}
+	return graph{make(map[point]map[point][]point), make(map[point][]point)}
 }
 
-func nodeString(node int32) string {
+func nodeString(node point) string {
 	x, y := unpack(node)
 	return fmt.Sprintf("(%d,%d)", x, y)
 }
@@ -59,7 +61,7 @@ var n, m, p, u, e int32
 var matrix []byte
 
 // set of people positions
-var ps map[int32]bool
+var ps map[point]bool
 
 // statistics
 var ops = 0
@@ -77,12 +79,12 @@ var root = newGraph()
 //Map from exit to path to nearest
 //var exit2node map[int32][]int32 = make(map[int32][]int32)
 
-func pack(x, y int32) int32 {
-	return x*m + y
+func pack(x, y int32) point {
+	return point(x*m + y)
 }
 
-func unpack(i int32) (x, y int32) {
-	return i / m, i % m
+func unpack(i point) (x, y int32) {
+	return int32(i) / m, int32(i) % m
 }
 
 func isValid(x, y int32) bool {
@@ -90,25 +92,25 @@ func isValid(x, y int32) bool {
 }
 
 // could not find a library function for this (:
-func reverse(slice []int32) []int32 {
+func reverse(slice []point) []point {
 	count := len(slice)
-	reversed := make([]int32, count, count)
+	reversed := make([]point, count, count)
 	for i, e := range slice {
 		reversed[count-1-i] = e
 	}
 	return reversed
 }
 
-func addPathToMap(from, to int32, path []int32) {
+func addPathToMap(from, to point, path []point) {
 	if _, ok := root.node2nodes[from]; !ok {
-		root.node2nodes[from] = make(map[int32][]int32)
+		root.node2nodes[from] = make(map[point][]point)
 	}
 	nodeMap := root.node2nodes[from]
 	nodeMap[to] = path
 }
 
-func extractPaths(from, to int32, parents []int32) (forward, backward []int32) {
-	backward = make([]int32, 0)
+func extractPaths(from, to point, parents []point) (forward, backward []point) {
+	backward = make([]point, 0)
 	for parents[to] >= 0 {
 		backward = append(backward, to)
 		to = parents[to]
@@ -118,19 +120,19 @@ func extractPaths(from, to int32, parents []int32) (forward, backward []int32) {
 	return forward[1:], backward[1:]
 }
 
-func addPath(from, to int32, parents []int32) {
+func addPath(from, to point, parents []point) {
 	forward, backward := extractPaths(from, to, parents)
 	addPathToMap(from, to, forward)
 	addPathToMap(to, from, backward)
 }
 
-func addExit(from, to int32, parents []int32) {
+func addExit(from, to point, parents []point) {
 	forward, _ := extractPaths(from, to, parents)
 	root.node2exit[from] = forward
 //	exit2node[to] = backward
 }
 
-func expand(pos int32, buffer *[8]int32) int {
+func expand(pos point, buffer *[8]point) int {
 	x, y := unpack(pos)
 	count := 0
 	for i := x - 1; i <= x+1; i++ {
@@ -149,14 +151,14 @@ func expand(pos int32, buffer *[8]int32) int {
 
 // Performs a breadth-first search from the given position, finding all reachable
 // nodes and the nearest exit
-func calculatePaths(pos int32) {
+func calculatePaths(pos point) {
 	x, y := unpack(pos)
 	fmt.Printf("Calculating paths from (%d,%d)\n", x, y)
 	start := time.Now()
 
-	var buffer [8]int32
-	queue := make([]int32, m*n)
-	parents := make([]int32, m*n)
+	var buffer [8]point
+	queue := make([]point, m*n)
+	parents := make([]point, m*n)
 	visited := make([]bool, m*n)
 	head := 0
 	tail := 1
@@ -207,7 +209,7 @@ func constructGraph(root graph) graph {
 	// split the graph into subgraphs, forget about subgraphs with no exit
 	for len(root.node2nodes) > 0 {
 		// get any map of target nodes with their pahts from the root graph
-		var nodes map[int32][]int32
+		var nodes map[point][]point
 		for _, nodes = range root.node2nodes { break }
 		
 		g := newGraph()
@@ -256,7 +258,7 @@ func parseTuple(line string) (x, y int32) {
 	y = parseInt(fields[1])
 	return
 }
-func parsePos(line string) int32 {
+func parsePos(line string) point {
 	return pack(parseTuple(line))
 }
 
@@ -268,8 +270,8 @@ func nextLine(scanner *bufio.Scanner) string {
 }
 
 func parseInput() {
-//	file, err := os.Open("/home/bert/git/codeeval/examples/rescue.example")
-	file, err := os.Open("/home/bbaron/codeeval/examples/rescue.example3")
+	file, err := os.Open("/home/bert/git/codeeval/examples/rescue.huge")
+//	file, err := os.Open("/home/bbaron/codeeval/examples/rescue.example3")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -284,7 +286,7 @@ func parseInput() {
 
 	// parse people
 	p = parseInt(nextLine(scanner))
-	ps = make(map[int32]bool)
+	ps = make(map[point]bool)
 	for i := 0; i < int(p); i++ {
 		pos := parsePos(nextLine(scanner))
 		ps[pos] = true
