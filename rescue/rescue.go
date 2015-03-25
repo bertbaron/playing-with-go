@@ -18,17 +18,18 @@ const (
 )
 
 type point int32
+type points []point
 
 type graph struct {
     //Map from P node to a map of reachable P nodes with the path between them
-	node2nodes map[point]map[point][]point
+	node2nodes map[point]map[point]points
 	
 	//Map from node to path to nearest exit (last element is the exit)
-	node2exit map[point][]point
+	node2exit map[point]points
 }
 
 func newGraph() graph {
-	return graph{make(map[point]map[point][]point), make(map[point][]point)}
+	return graph{make(map[point]map[point]points), make(map[point]points)}
 }
 
 func nodeString(node point) string {
@@ -92,25 +93,25 @@ func isValid(x, y int32) bool {
 }
 
 // could not find a library function for this (:
-func reverse(slice []point) []point {
+func reverse(slice points) points {
 	count := len(slice)
-	reversed := make([]point, count, count)
+	reversed := make(points, count, count)
 	for i, e := range slice {
 		reversed[count-1-i] = e
 	}
 	return reversed
 }
 
-func addPathToMap(from, to point, path []point) {
+func addPathToMap(from, to point, path points) {
 	if _, ok := root.node2nodes[from]; !ok {
-		root.node2nodes[from] = make(map[point][]point)
+		root.node2nodes[from] = make(map[point]points)
 	}
 	nodeMap := root.node2nodes[from]
 	nodeMap[to] = path
 }
 
-func extractPaths(from, to point, parents []point) (forward, backward []point) {
-	backward = make([]point, 0)
+func extractPaths(from, to point, parents points) (forward, backward points) {
+	backward = make(points, 0)
 	for parents[to] >= 0 {
 		backward = append(backward, to)
 		to = parents[to]
@@ -120,13 +121,13 @@ func extractPaths(from, to point, parents []point) (forward, backward []point) {
 	return forward[1:], backward[1:]
 }
 
-func addPath(from, to point, parents []point) {
+func addPath(from, to point, parents points) {
 	forward, backward := extractPaths(from, to, parents)
 	addPathToMap(from, to, forward)
 	addPathToMap(to, from, backward)
 }
 
-func addExit(from, to point, parents []point) {
+func addExit(from, to point, parents points) {
 	forward, _ := extractPaths(from, to, parents)
 	root.node2exit[from] = forward
 //	exit2node[to] = backward
@@ -157,8 +158,8 @@ func calculatePaths(pos point) {
 	start := time.Now()
 
 	var buffer [8]point
-	queue := make([]point, m*n)
-	parents := make([]point, m*n)
+	queue := make(points, m*n)
+	parents := make(points, m*n)
 	visited := make([]bool, m*n)
 	head := 0
 	tail := 1
@@ -209,7 +210,7 @@ func constructGraph(root graph) graph {
 	// split the graph into subgraphs, forget about subgraphs with no exit
 	for len(root.node2nodes) > 0 {
 		// get any map of target nodes with their pahts from the root graph
-		var nodes map[point][]point
+		var nodes map[point]points
 		for _, nodes = range root.node2nodes { break }
 		
 		g := newGraph()
