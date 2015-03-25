@@ -20,10 +20,15 @@ const (
 type point int32
 type points []point
 
+func (p point) String() string {
+	x, y := unpack(p)
+	return fmt.Sprintf("(%d,%d)", x, y)
+}
+
 type graph struct {
-    //Map from P node to a map of reachable P nodes with the path between them
+	//Map from P node to a map of reachable P nodes with the path between them
 	node2nodes map[point]map[point]points
-	
+
 	//Map from node to path to nearest exit (last element is the exit)
 	node2exit map[point]points
 }
@@ -32,17 +37,12 @@ func newGraph() graph {
 	return graph{make(map[point]map[point]points), make(map[point]points)}
 }
 
-func nodeString(node point) string {
-	x, y := unpack(node)
-	return fmt.Sprintf("(%d,%d)", x, y)
-}
-
 func (g graph) pprint() {
 	fmt.Println("graph nodes:")
 	for from, paths := range g.node2nodes {
-		fmt.Println("  ", nodeString(from))
+		fmt.Println("  ", from)
 		for to, path := range paths {
-			fmt.Printf("    %s : %d\n", nodeString(to), len(path))
+			fmt.Printf("    %s : %d\n", to, len(path))
 		}
 	}
 	fmt.Println("nearest exits:")
@@ -50,8 +50,8 @@ func (g graph) pprint() {
 		exit := node
 		if len(path) > 0 {
 			exit = path[len(path)-1]
-		}	
-		fmt.Printf("  %s -> %s: %d\n", nodeString(node), nodeString(exit), len(path))
+		}
+		fmt.Printf("  %s -> %s: %d\n", node, exit, len(path))
 	}
 }
 
@@ -69,16 +69,6 @@ var ops = 0
 
 // the graph, build up during the calculation phase.
 var root = newGraph()
-
-////Map from P node to a map of reachable P nodes with the path between them
-//var node2nodes map[int32]map[int32][]int32 = make(map[int32]map[int32][]int32)
-//
-////Map from node to path to nearest exit
-//var node2exit map[int32][]int32 = make(map[int32][]int32)
-
-
-//Map from exit to path to nearest
-//var exit2node map[int32][]int32 = make(map[int32][]int32)
 
 func pack(x, y int32) point {
 	return point(x*m + y)
@@ -130,7 +120,7 @@ func addPath(from, to point, parents points) {
 func addExit(from, to point, parents points) {
 	forward, _ := extractPaths(from, to, parents)
 	root.node2exit[from] = forward
-//	exit2node[to] = backward
+	//	exit2node[to] = backward
 }
 
 // Performs a breadth-first search from the given position, finding all reachable
@@ -188,19 +178,21 @@ func constructGraph(root graph) graph {
 		calculatePaths(k)
 	}
 	root.pprint()
-	
+
 	var subgraphs []graph
-	
+
 	size := 0 // size of biggest reachable subgraph
 
 	// split the graph into subgraphs, forget about subgraphs with no exit
 	for len(root.node2nodes) > 0 {
 		// get any map of target nodes with their pahts from the root graph
 		var nodes map[point]points
-		for _, nodes = range root.node2nodes { break }
-		
+		for _, nodes = range root.node2nodes {
+			break
+		}
+
 		g := newGraph()
-		
+
 		for to, _ := range nodes {
 			g.node2nodes[to] = root.node2nodes[to]
 			if exit, ok := root.node2exit[to]; ok {
@@ -258,7 +250,7 @@ func nextLine(scanner *bufio.Scanner) string {
 
 func parseInput() {
 	file, err := os.Open("/home/bert/git/codeeval/examples/rescue.huge")
-//	file, err := os.Open("/home/bbaron/codeeval/examples/rescue.example3")
+	//	file, err := os.Open("/home/bbaron/codeeval/examples/rescue.example3")
 	if err != nil {
 		log.Fatal(err)
 	}
