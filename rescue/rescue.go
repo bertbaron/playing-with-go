@@ -70,6 +70,11 @@ var ops = 0
 // the graph, build up during the calculation phase.
 var root = newGraph()
 
+// logs the time since the given start
+func timed(msg string, start time.Time) {
+	fmt.Println(msg, time.Since(start))
+}
+
 func pack(x, y int32) point {
 	return point(x*m + y)
 }
@@ -129,6 +134,7 @@ func calculatePaths(pos point) {
 	x, y := unpack(pos)
 	fmt.Printf("Calculating paths from (%d,%d)\n", x, y)
 	start := time.Now()
+	defer timed("Traversed in", start)
 
 	queue := make(points, m*n)
 	parents := make(points, m*n)
@@ -169,7 +175,6 @@ func calculatePaths(pos point) {
 			}
 		}
 	}
-	fmt.Printf("Traversed in %s\n", time.Since(start))
 }
 
 // Constructs the relevant graph with nodes and nearest exits.
@@ -249,7 +254,7 @@ func nextLine(scanner *bufio.Scanner) string {
 }
 
 func parseInput() {
-	file, err := os.Open("/home/bert/git/codeeval/examples/rescue.huge")
+	file, err := os.Open("/home/bert/git/codeeval/examples/rescue.example3")
 	//	file, err := os.Open("/home/bbaron/codeeval/examples/rescue.example3")
 	if err != nil {
 		log.Fatal(err)
@@ -257,6 +262,8 @@ func parseInput() {
 	defer file.Close()
 
 	start := time.Now()
+	defer timed("Parsed in", start)
+
 	scanner := bufio.NewScanner(file)
 	n, m = parseTuple(nextLine(scanner))
 	fmt.Printf("n=%d, m=%d\n", n, m)
@@ -287,17 +294,15 @@ func parseInput() {
 	}
 
 	fmt.Println("")
-
-	elapsed := time.Since(start)
-	fmt.Printf("Parsed in %s\n", elapsed)
 }
 
 func main() {
 	start := time.Now()
-
+	defer timed("Total time:", start)
+	
 	parseInput()
 	constructGraph(root)
 
 	fmt.Printf("%d operations\n", ops)
-	fmt.Printf("Total time: %s", time.Since(start))
+//	fmt.Printf("Total time: %s", time.Since(start))
 }
