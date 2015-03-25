@@ -133,29 +133,9 @@ func addExit(from, to point, parents points) {
 //	exit2node[to] = backward
 }
 
-func expand(pos point, buffer *[8]point) int {
-	x, y := unpack(pos)
-	count := 0
-	for i := x - 1; i <= x+1; i++ {
-		for j := y - 1; j <= y+1; j++ {
-			if (i != x || j != y) && isValid(i, j) {
-				neighbour := pack(i, j)
-				if matrix[neighbour]&U == 0 {
-					buffer[count] = neighbour
-					count++
-				}
-			}
-		}
-	}
-	return count
-}
-
 // Performs a breadth-first search from the given position, finding all reachable
 // nodes and the nearest exit
 func calculatePaths(pos point) {
-	dxs := [...]int32{-1, -1, -1,  0,  0,  1,  1,  1}
-	dys := [...]int32{-1,  0,  1, -1,  1, -1,  0,  1}
-	
 	x, y := unpack(pos)
 	fmt.Printf("Calculating paths from (%d,%d)\n", x, y)
 	start := time.Now()
@@ -171,7 +151,6 @@ func calculatePaths(pos point) {
 	for head < tail {
 		ops += 1
 		p := queue[head]
-//		fmt.Printf("head=%d, p=%d\n", head, p)
 		head += 1
 
 		if matrix[p]&P != 0 {
@@ -186,45 +165,19 @@ func calculatePaths(pos point) {
 			exitFound = true
 		}
 
-		//expanded := expand(p, &buffer)
-//		for i := 0; i < expanded; i++ {
-//			nb := buffer[i]
-//			if !visited[nb] {
-//				visited[nb], parents[nb] = true, p
-//				queue[tail] = nb
-//				tail += 1
-//			}
-//		}
-
 		x, y := unpack(p)
-//		fmt.Println("expanding ", p)
-		for i, dx := range dxs {
-			dy := dys[i]
-			nx, ny := x+dx, y+dy
-			if isValid(nx, ny) {
-				nb := pack(nx, ny)
-//				fmt.Printf("(%d, %d) + (%d, %d) = (%d, %d)\n", x, y, dx, dy, nx, ny)
-				if matrix[nb]&U == 0 {
-					if !visited[nb] {
+		for nx := x - 1; nx <= x+1; nx++ {
+			for ny := y - 1; ny <= y+1; ny++ {
+				if (nx != x || ny != y) && isValid(nx, ny) {
+					nb := pack(nx, ny)
+					if matrix[nb]&U == 0 && !visited[nb] {
 						visited[nb], parents[nb] = true, p
 						queue[tail] = nb
 						tail += 1
 					}
-				}				
+				}
 			}
 		}
-//	for i := x - 1; i <= x+1; i++ {
-//		for j := y - 1; j <= y+1; j++ {
-//			if (i != x || j != y) && isValid(i, j) {
-//				neighbour := pack(i, j)
-//				if matrix[neighbour]&U == 0 {
-//					buffer[count] = neighbour
-//					count++
-//				}
-//			}
-//		}
-//	}
-
 	}
 	fmt.Printf("Traversed in %s\n", time.Since(start))
 }
