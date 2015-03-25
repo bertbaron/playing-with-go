@@ -254,7 +254,7 @@ func nextLine(scanner *bufio.Scanner) string {
 }
 
 func parseInput() {
-	file, err := os.Open("/home/bert/git/codeeval/examples/rescue.example3")
+	file, err := os.Open("/home/bert/git/codeeval/examples/rescue.large")
 	//	file, err := os.Open("/home/bbaron/codeeval/examples/rescue.example3")
 	if err != nil {
 		log.Fatal(err)
@@ -272,6 +272,7 @@ func parseInput() {
 
 	// parse people
 	p = parseInt(nextLine(scanner))
+	fmt.Printf("p=%d", p)
 	ps = make(map[point]bool)
 	for i := 0; i < int(p); i++ {
 		pos := parsePos(nextLine(scanner))
