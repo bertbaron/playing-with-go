@@ -304,5 +304,4 @@ func main() {
 	constructGraph(root)
 
 	fmt.Printf("%d operations\n", ops)
-//	fmt.Printf("Total time: %s", time.Since(start))
 }
