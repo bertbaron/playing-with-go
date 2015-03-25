@@ -17,6 +17,41 @@ const (
 	E = 1 << iota
 )
 
+type graph struct {
+    //Map from P node to a map of reachable P nodes with the path between them
+	node2nodes map[int32]map[int32][]int32
+	
+	//Map from node to path to nearest exit (last element is the exit)
+	node2exit map[int32][]int32
+}
+
+func newGraph() graph {
+	return graph{make(map[int32]map[int32][]int32), make(map[int32][]int32)}
+}
+
+func nodeString(node int32) string {
+	x, y := unpack(node)
+	return fmt.Sprintf("(%d,%d)", x, y)
+}
+
+func (g graph) pprint() {
+	fmt.Println("graph nodes:")
+	for from, paths := range g.node2nodes {
+		fmt.Println("  ", nodeString(from))
+		for to, path := range paths {
+			fmt.Printf("    %s : %d\n", nodeString(to), len(path))
+		}
+	}
+	fmt.Println("nearest exits:")
+	for node, path := range g.node2exit {
+		exit := node
+		if len(path) > 0 {
+			exit = path[len(path)-1]
+		}	
+		fmt.Printf("  %s -> %s: %d\n", nodeString(node), nodeString(exit), len(path))
+	}
+}
+
 // height, width and number of people, unpassable objects and exits
 var n, m, p, u, e int32
 
@@ -29,11 +64,15 @@ var ps map[int32]bool
 // statistics
 var ops = 0
 
-//Map from P node to a map of reachable P nodes with the path between them
-var node2nodes map[int32]map[int32][]int32 = make(map[int32]map[int32][]int32)
+// the graph, build up during the calculation phase.
+var root = newGraph()
 
-//Map from node to path to nearest exit
-var node2exit map[int32][]int32 = make(map[int32][]int32)
+////Map from P node to a map of reachable P nodes with the path between them
+//var node2nodes map[int32]map[int32][]int32 = make(map[int32]map[int32][]int32)
+//
+////Map from node to path to nearest exit
+//var node2exit map[int32][]int32 = make(map[int32][]int32)
+
 
 //Map from exit to path to nearest
 //var exit2node map[int32][]int32 = make(map[int32][]int32)
@@ -61,10 +100,10 @@ func reverse(slice []int32) []int32 {
 }
 
 func addPathToMap(from, to int32, path []int32) {
-	if _, ok := node2nodes[from]; !ok {
-		node2nodes[from] = make(map[int32][]int32)
+	if _, ok := root.node2nodes[from]; !ok {
+		root.node2nodes[from] = make(map[int32][]int32)
 	}
-	nodeMap := node2nodes[from]
+	nodeMap := root.node2nodes[from]
 	nodeMap[to] = path
 }
 
@@ -87,7 +126,7 @@ func addPath(from, to int32, parents []int32) {
 
 func addExit(from, to int32, parents []int32) {
 	forward, _ := extractPaths(from, to, parents)
-	node2exit[from] = forward
+	root.node2exit[from] = forward
 //	exit2node[to] = backward
 }
 
@@ -108,6 +147,8 @@ func expand(pos int32, buffer *[8]int32) int {
 	return count
 }
 
+// Performs a breadth-first search from the given position, finding all reachable
+// nodes and the nearest exit
 func calculatePaths(pos int32) {
 	x, y := unpack(pos)
 	fmt.Printf("Calculating paths from (%d,%d)\n", x, y)
@@ -152,40 +193,53 @@ func calculatePaths(pos int32) {
 	fmt.Printf("Traversed in %s\n", time.Since(start))
 }
 
-type graph struct {
-    //Map from P node to a map of reachable P nodes with the path between them
-	nodes map[int32]map[int32][]int32
-	
-	//Map from node to path to nearest exit
-	node2exit map[int32][]int32
-}
-
-// Constructs the graph with nodes and nearest exits.
-// Requires the global variables for the input to be initialized.
-func constructGraph() []graph {
+// Constructs the relevant graph with nodes and nearest exits.
+func constructGraph(root graph) graph {
 	for k := range ps {
 		calculatePaths(k)
 	}
+	root.pprint()
+	
 	var subgraphs []graph
 	
-//	size := 0 // size of biggest reachable subgraph
+	size := 0 // size of biggest reachable subgraph
 
-	// split the graph into subgraphs
-	for len(node2nodes) > 0 {
-		// wow, its really not trivial to get any single element from a map
-		var from int32
+	// split the graph into subgraphs, forget about subgraphs with no exit
+	for len(root.node2nodes) > 0 {
+		// get any map of target nodes with their pahts from the root graph
 		var nodes map[int32][]int32
-		for from, nodes = range node2nodes { break }
+		for _, nodes = range root.node2nodes { break }
 		
-		delete(node2nodes, from)
-		g := graph{make(map[int32]map[int32][]int32), make(map[int32][]int32)}
+		g := newGraph()
+		
 		for to, _ := range nodes {
-			g.nodes[from] = nodes
-			delete(node2nodes, to)
+			g.node2nodes[to] = root.node2nodes[to]
+			if exit, ok := root.node2exit[to]; ok {
+				g.node2exit[to] = exit
+			}
+			delete(root.node2nodes, to)
 		}
-		subgraphs = append(subgraphs, g)
+		if len(g.node2exit) > 0 {
+			// only remember subgraphs with exit
+			subgraphs = append(subgraphs, g)
+			if len(nodes) > size {
+				size = len(nodes)
+			}
+		}
 	}
-	return subgraphs
+	biggest := newGraph()
+	for _, g := range subgraphs {
+		if len(g.node2nodes) == size {
+			for k, v := range g.node2nodes {
+				biggest.node2nodes[k] = v
+			}
+			for k, v := range g.node2exit {
+				biggest.node2exit[k] = v
+			}
+		}
+	}
+	biggest.pprint()
+	return biggest
 }
 
 func parseInt(s string) int32 {
@@ -214,8 +268,8 @@ func nextLine(scanner *bufio.Scanner) string {
 }
 
 func parseInput() {
-	file, err := os.Open("/home/bert/git/codeeval/examples/rescue.example")
-	//	file, err := os.Open("/home/bbaron/codeeval/examples/rescue.huge")
+//	file, err := os.Open("/home/bert/git/codeeval/examples/rescue.example")
+	file, err := os.Open("/home/bbaron/codeeval/examples/rescue.example3")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -261,7 +315,7 @@ func main() {
 	start := time.Now()
 
 	parseInput()
-	constructGraph()
+	constructGraph(root)
 
 	fmt.Printf("%d operations\n", ops)
 	fmt.Printf("Total time: %s", time.Since(start))
