@@ -70,6 +70,9 @@ var ops = 0
 // the graph, build up during the calculation phase.
 var root = newGraph()
 
+// sets of connected nodes, mapping to true if they have an exit or false if not
+var nodesets []map[point]bool
+
 // logs the time since the given start
 func timed(msg string, start time.Time) {
 	fmt.Println(msg, time.Since(start))
@@ -128,6 +131,16 @@ func addExit(from, to point, parents points) {
 	//	exit2node[to] = backward
 }
 
+// indicates that all necesary paths from the specified point have been calculated
+func completed(pos point) {
+	for _, set := range nodesets {
+		if set[pos] { return }
+	}
+	set := make(map[point]bool)
+	for node, _ := range root.node2nodes[pos] {
+		set[node] = true
+	}
+}
 // Performs a breadth-first search from the given position, finding all reachable
 // nodes and the nearest exit
 func calculatePaths(pos point) {
@@ -175,6 +188,8 @@ func calculatePaths(pos point) {
 			}
 		}
 	}
+	
+	completed(pos)
 }
 
 // Constructs the relevant graph with nodes and nearest exits.
@@ -254,8 +269,8 @@ func nextLine(scanner *bufio.Scanner) string {
 }
 
 func parseInput() {
-	file, err := os.Open("/home/bert/git/codeeval/examples/rescue.large")
-	//	file, err := os.Open("/home/bbaron/codeeval/examples/rescue.example3")
+//	file, err := os.Open("/home/bert/git/codeeval/examples/rescue.large")
+	file, err := os.Open("/home/bbaron/codeeval/examples/rescue.large")
 	if err != nil {
 		log.Fatal(err)
 	}
