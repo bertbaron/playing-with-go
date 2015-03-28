@@ -33,6 +33,11 @@ type graph struct {
 	node2exit map[point]points
 }
 
+type nodegroup struct {
+	nodes map[point]bool 
+	hasExit bool
+}
+
 func newGraph() graph {
 	return graph{make(map[point]map[point]points), make(map[point]points)}
 }
@@ -70,8 +75,8 @@ var ops = 0
 // the graph, build up during the calculation phase.
 var root = newGraph()
 
-// sets of connected nodes, mapping to true if they have an exit or false if not
-var nodesets []map[point]bool
+// groups of connected nodes, with possible exits
+var nodegroups []nodegroup
 
 // logs the time since the given start
 func timed(msg string, start time.Time) {
@@ -131,16 +136,47 @@ func addExit(from, to point, parents points) {
 	//	exit2node[to] = backward
 }
 
+func getCompletedGroup(pos point) *nodegroup {
+	for _, group := range nodegroups {
+		if group.nodes[pos] {
+			return &group
+		}
+	}
+	return nil
+}
+
 // indicates that all necesary paths from the specified point have been calculated
 func completed(pos point) {
-	for _, set := range nodesets {
-		if set[pos] { return }
-	}
-	set := make(map[point]bool)
-	for node, _ := range root.node2nodes[pos] {
-		set[node] = true
+	if getCompletedGroup(pos) == nil {
+		set := make(map[point]bool)
+		for node, _ := range root.node2nodes[pos] {
+			set[node] = true
+		}
+		nodegroups = append(nodegroups, nodegroup{set, len(root.node2exit[pos])>0})
+		fmt.Println("completed: ", nodegroups)
+	} else {
+		fmt.Println("already completed")
 	}
 }
+
+// returns true if all possible paths for the point have been calculated or if it makes no sense to continue
+func isDone(pos point, exitFound bool) bool {
+	max := int(p)
+	for _, group := range nodegroups {
+		if group.nodes[pos] {
+			if !group.hasExit { return true }
+			max = len(group.nodes)
+			break
+		} else {
+			max -= len(group.nodes)
+		}
+	}
+	// we could also stop if we already found a bigger group with an exit
+	
+	done := len(root.node2nodes[pos])
+	return exitFound && done >= max
+}
+
 // Performs a breadth-first search from the given position, finding all reachable
 // nodes and the nearest exit
 func calculatePaths(pos point) {
@@ -166,12 +202,14 @@ func calculatePaths(pos point) {
 			x, y := unpack(p)
 			fmt.Printf("  found (%d, %d)\n", x, y)
 			addPath(pos, p, parents)
+			if isDone(pos, exitFound) { return }
 		}
 		if !exitFound && matrix[p]&E != 0 {
 			x, y := unpack(p)
 			fmt.Printf("  found exit (%d, %d)\n", x, y)
 			addExit(pos, p, parents)
 			exitFound = true
+			if isDone(pos, exitFound) { return }
 		}
 
 		x, y := unpack(p)
@@ -188,7 +226,7 @@ func calculatePaths(pos point) {
 			}
 		}
 	}
-	
+
 	completed(pos)
 }
 
@@ -239,7 +277,7 @@ func constructGraph(root graph) graph {
 			}
 		}
 	}
-	biggest.pprint()
+//	biggest.pprint()
 	return biggest
 }
 
@@ -269,8 +307,8 @@ func nextLine(scanner *bufio.Scanner) string {
 }
 
 func parseInput() {
-//	file, err := os.Open("/home/bert/git/codeeval/examples/rescue.large")
-	file, err := os.Open("/home/bbaron/codeeval/examples/rescue.large")
+	file, err := os.Open("/home/bert/git/codeeval/examples/rescue.huge")
+	//	file, err := os.Open("/home/bbaron/codeeval/examples/rescue.large")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -315,7 +353,7 @@ func parseInput() {
 func main() {
 	start := time.Now()
 	defer timed("Total time:", start)
-	
+
 	parseInput()
 	constructGraph(root)
 
