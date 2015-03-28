@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"sync"
 )
 
 // bit masks for P, U and E in the byte matrix
@@ -36,6 +37,14 @@ type graph struct {
 type nodegroup struct {
 	nodes map[point]bool 
 	hasExit bool
+}
+
+func (group nodegroup) String() string {
+	strings := make([]string, 0)
+	for node, _ := range group.nodes {
+		strings = append(strings, node.String())
+	}
+	return fmt.Sprintf("%v: %v", strings, group.hasExit)
 }
 
 func newGraph() graph {
@@ -72,11 +81,18 @@ var ps map[point]bool
 // statistics
 var ops = 0
 
+// Mutex for guarding SHARED STATE
+var mutex = sync.Mutex{}
+
+// SHARED STATE
 // the graph, build up during the calculation phase.
 var root = newGraph()
 
+// SHARED STATE
 // groups of connected nodes, with possible exits
 var nodegroups []nodegroup
+
+
 
 // logs the time since the given start
 func timed(msg string, start time.Time) {
@@ -105,7 +121,10 @@ func reverse(slice points) points {
 	return reversed
 }
 
+// adds path to the global root graph
 func addPathToMap(from, to point, path points) {
+	mutex.Lock()
+	defer mutex.Unlock()
 	if _, ok := root.node2nodes[from]; !ok {
 		root.node2nodes[from] = make(map[point]points)
 	}
@@ -131,6 +150,8 @@ func addPath(from, to point, parents points) {
 }
 
 func addExit(from, to point, parents points) {
+	mutex.Lock()
+	defer mutex.Unlock()
 	forward, _ := extractPaths(from, to, parents)
 	root.node2exit[from] = forward
 	//	exit2node[to] = backward
@@ -147,6 +168,8 @@ func getCompletedGroup(pos point) *nodegroup {
 
 // indicates that all necesary paths from the specified point have been calculated
 func completed(pos point) {
+	mutex.Lock()
+	defer mutex.Unlock()	
 	if getCompletedGroup(pos) == nil {
 		set := make(map[point]bool)
 		for node, _ := range root.node2nodes[pos] {
@@ -161,6 +184,8 @@ func completed(pos point) {
 
 // returns true if all possible paths for the point have been calculated or if it makes no sense to continue
 func isDone(pos point, exitFound bool) bool {
+	mutex.Lock()
+	defer mutex.Unlock()
 	max := int(p)
 	for _, group := range nodegroups {
 		if group.nodes[pos] {
@@ -177,11 +202,18 @@ func isDone(pos point, exitFound bool) bool {
 	return exitFound && done >= max
 }
 
+func done(ch chan <- bool) {
+	ch <- true
+}
 // Performs a breadth-first search from the given position, finding all reachable
 // nodes and the nearest exit
-func calculatePaths(pos point) {
+func calculatePaths(pos point, ch chan <- bool) {
+	defer done(ch)
+	
 	x, y := unpack(pos)
 	fmt.Printf("Calculating paths from (%d,%d)\n", x, y)
+	if isDone(pos, false) { return }
+	
 	start := time.Now()
 	defer timed("Traversed in", start)
 
@@ -194,6 +226,7 @@ func calculatePaths(pos point) {
 	queue[head] = pos
 	visited[pos], parents[pos] = true, -1
 	for head < tail {
+		if head % 1000 == 0 && isDone(pos, exitFound) { return } 
 		ops += 1
 		p := queue[head]
 		head += 1
@@ -231,12 +264,18 @@ func calculatePaths(pos point) {
 }
 
 // Constructs the relevant graph with nodes and nearest exits.
-func constructGraph(root graph) graph {
+func constructGraph(root graph) {
+	ch := make(chan bool, p)
 	for k := range ps {
-		calculatePaths(k)
+		calculatePaths(k, ch)
 	}
-	root.pprint()
+	for k := range ps {
+		<- ch
+		fmt.Sprintf("%v", k) // how to loop over range without variable assignment?
+	}
 
+	root.pprint()
+	return
 	var subgraphs []graph
 
 	size := 0 // size of biggest reachable subgraph
@@ -278,7 +317,7 @@ func constructGraph(root graph) graph {
 		}
 	}
 //	biggest.pprint()
-	return biggest
+//	return biggest
 }
 
 func parseInt(s string) int32 {
