@@ -9,7 +9,12 @@ import (
 	"strings"
 	"time"
 	"sync"
+//	"sort"
+	"runtime"
 )
+
+const threads = 2
+//var threads = runtime.NumCPU()
 
 // bit masks for P, U and E in the byte matrix
 const (
@@ -209,13 +214,11 @@ func done(ch chan <- bool) {
 // nodes and the nearest exit
 func calculatePaths(pos point, ch chan <- bool) {
 	defer done(ch)
-	
 	x, y := unpack(pos)
 	fmt.Printf("Calculating paths from (%d,%d)\n", x, y)
-	if isDone(pos, false) { return }
-	
 	start := time.Now()
 	defer timed("Traversed in", start)
+	if isDone(pos, false) { return }
 
 	queue := make(points, m*n)
 	parents := make(points, m*n)
@@ -226,20 +229,18 @@ func calculatePaths(pos point, ch chan <- bool) {
 	queue[head] = pos
 	visited[pos], parents[pos] = true, -1
 	for head < tail {
-		if head % 1000 == 0 && isDone(pos, exitFound) { return } 
-		ops += 1
+//		if head % 100000 == 0 && isDone(pos, exitFound) { return } 
+//		ops += 1
 		p := queue[head]
 		head += 1
 
 		if matrix[p]&P != 0 {
-			x, y := unpack(p)
-			fmt.Printf("  found (%d, %d)\n", x, y)
+//			fmt.Printf("  found %v\n", p)
 			addPath(pos, p, parents)
 			if isDone(pos, exitFound) { return }
 		}
 		if !exitFound && matrix[p]&E != 0 {
-			x, y := unpack(p)
-			fmt.Printf("  found exit (%d, %d)\n", x, y)
+//			fmt.Printf("  found exit %v\n", p)
 			addExit(pos, p, parents)
 			exitFound = true
 			if isDone(pos, exitFound) { return }
@@ -263,11 +264,21 @@ func calculatePaths(pos point, ch chan <- bool) {
 	completed(pos)
 }
 
+func worker(in <- chan point, out chan <- bool) {
+	for p := range in {
+		calculatePaths(p, out)
+	}
+}
 // Constructs the relevant graph with nodes and nearest exits.
 func constructGraph(root graph) {
+	in := make(chan point, p)
 	ch := make(chan bool, p)
+	for q := 0; q < threads; q++ {
+		go worker(in, ch)
+	}
 	for k := range ps {
-		calculatePaths(k, ch)
+//		go calculatePaths(k, ch)
+		in <- k
 	}
 	for k := range ps {
 		<- ch
@@ -390,6 +401,8 @@ func parseInput() {
 }
 
 func main() {
+	// Set $GOMAXPROCS to allow parallelization
+	runtime.GOMAXPROCS(threads)
 	start := time.Now()
 	defer timed("Total time:", start)
 
