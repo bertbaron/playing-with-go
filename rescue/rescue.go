@@ -13,7 +13,7 @@ import (
 	"runtime"
 )
 
-const threads = 2
+const threads = 1
 //var threads = runtime.NumCPU()
 
 // bit masks for P, U and E in the byte matrix
